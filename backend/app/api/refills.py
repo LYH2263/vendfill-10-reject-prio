@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.models import Lane, Location, RefillOrder
-from app.services.fill_engine import build_fill_lines, summarize
+from app.services.fill_engine import REJECT_FULL, build_fill_lines, summarize
 router = APIRouter(prefix="/refills", tags=["refills"])
 
 @router.post("/run")
@@ -14,7 +14,8 @@ def run_refill(location_id: int = 1, db: Session = Depends(get_db)):
     if not loc: raise HTTPException(404, "点位不存在")
     lanes = db.scalars(select(Lane).where(Lane.location_id == location_id).order_by(Lane.slot_no)).all()
     payload = [{"id": l.id, "slot_no": l.slot_no, "sku_name": l.sku_name,
-                "capacity": l.capacity, "stock": l.stock, "in_transit": l.in_transit} for l in lanes]
+                "capacity": l.capacity, "stock": l.stock, "in_transit": l.in_transit,
+                "blocked": bool(l.blocked)} for l in lanes]
     summary = summarize(build_fill_lines(payload))
     order = RefillOrder(location_id=location_id, created_at=datetime.utcnow(),
                         lines_json=json.dumps(summary, ensure_ascii=False))
@@ -33,7 +34,9 @@ def latest(location_id: int = 1, db: Session = Depends(get_db)):
 @router.get("/full")
 def full_lanes(location_id: int = 1, db: Session = Depends(get_db)):
     data = latest(location_id=location_id, db=db)
-    return {"location_id": location_id, "lanes": [l for l in data["lines"] if l["status"] == "full"]}
+    # 满仓页只收 reject_code == full 的行；超占/封锁即使补量为 0 也不得收录
+    return {"location_id": location_id,
+            "lanes": [l for l in data["lines"] if l.get("reject_code") == REJECT_FULL]}
 
 @router.get("/summary")
 def refill_summary(location_id: int = 1, db: Session = Depends(get_db)):
@@ -43,5 +46,6 @@ def refill_summary(location_id: int = 1, db: Session = Depends(get_db)):
         "total_fill": data["total_fill"],
         "need_fill_count": data["need_fill_count"],
         "full_count": data["full_count"],
+        "blocked_count": data.get("blocked_count", 0),
         "overbooked_count": data["overbooked_count"],
     }

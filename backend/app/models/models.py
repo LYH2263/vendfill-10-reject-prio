@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
@@ -19,6 +19,8 @@ class Lane(Base):
     capacity: Mapped[int] = mapped_column(Integer)
     stock: Mapped[int] = mapped_column(Integer, default=0)
     in_transit: Mapped[int] = mapped_column(Integer, default=0)
+    # 封锁字段：点位/货道未配置时默认 False，引擎不得据此冒出封锁码
+    blocked: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
 
 class Sale(Base):
     __tablename__ = "sales"

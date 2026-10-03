@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { api } from '../api'
+import { rejectLabel } from '../rejectCodes'
 const data = ref<any>(null)
 async function run() { data.value = await api('/refills/run?location_id=1', { method: 'POST' }) }
 onMounted(run)
 </script>
 <template>
   <h1>补货小票</h1>
-  <p class="sub">gap = 容量 − 库存 − 在途 · 收据纸样式</p>
+  <p class="sub">gap = 容量 − 库存 − 在途 · 零补量行只标一个拒因：超占 &gt; 封锁 &gt; 满仓</p>
   <button class="btn" @click="run">生成补货单</button>
   <div style="margin-top:1rem" v-if="data">
     <div class="vf-receipt">
@@ -17,7 +18,8 @@ onMounted(run)
       </div>
       <div class="vf-receipt-line" v-for="l in data.lines" :key="l.lane_id">
         <span>{{ l.slot_no }} {{ l.sku_name }}
-          <small>({{ l.status === 'need_fill' ? '待补' : l.status === 'full' ? '满仓' : '超占' }})</small>
+          <small v-if="l.fill_qty > 0">(待补)</small>
+          <small v-else-if="l.reject_code">({{ rejectLabel(l.reject_code) }})</small>
         </span>
         <span>{{ l.fill_qty }} / 缺{{ l.gap }}</span>
       </div>
