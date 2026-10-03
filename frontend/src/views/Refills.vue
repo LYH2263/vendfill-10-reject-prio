@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { api } from '../api'
+import { reasonLabel, REASON_NOTES } from '../codes'
 const data = ref<any>(null)
 async function run() { data.value = await api('/refills/run?location_id=1', { method: 'POST' }) }
 onMounted(run)
@@ -17,7 +18,10 @@ onMounted(run)
       </div>
       <div class="vf-receipt-line" v-for="l in data.lines" :key="l.lane_id">
         <span>{{ l.slot_no }} {{ l.sku_name }}
-          <small>({{ l.status === 'need_fill' ? '待补' : l.status === 'full' ? '满仓' : '超占' }})</small>
+          <!-- 正补量行无拒因；零补量行按统一码显示互斥结论 -->
+          <small v-if="l.reject_reason" :title="REASON_NOTES[l.reject_reason]">
+            （{{ reasonLabel(l.reject_reason) }}）
+          </small>
         </span>
         <span>{{ l.fill_qty }} / 缺{{ l.gap }}</span>
       </div>
